@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Evidence Logbook</title>
+<meta name="theme-color" content="#16212C">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.30.0/lib/msal-browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+</head>
+<body>
+<div id="app"></div>
+<div class="fileinputs" aria-hidden="true">
+  <input type="file" id="f-cam" accept="image/*" capture="environment">
+  <input type="file" id="f-gal" accept="image/*" multiple>
+  <input type="file" id="f-book" accept="application/pdf,.pdf,image/*" multiple>
+  <input type="file" id="f-signed" accept="image/*,application/pdf,.pdf">
+  <input type="file" id="f-replbook" accept="application/pdf,.pdf,image/*" multiple>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
