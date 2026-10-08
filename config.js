@@ -5,7 +5,7 @@ window.APP_CONFIG = {
   clientId: "ba9331b7-6bf9-452a-8062-021c2303937c",
 
   // Your Cloudflare Worker address, e.g. "https://evidence-ai.yourname.workers.dev"
-  workerUrl: "PASTE-WORKER-URL-HERE",
+  workerUrl: "https://evidence.j-snaddon.workers.dev",
 
   // Folder created in each apprentice's OneDrive
   rootFolder: "Apprenticeship Evidence",
