@@ -153,3 +153,5 @@ nav.bar button.cap{background:var(--signal);color:var(--signal-ink);font-family:
 .wall{padding:40px 8px}
 .fileinputs{position:absolute;left:-9999px;top:0;width:1px;height:1px;overflow:hidden;opacity:0}
 label.btn{user-select:none}
+.guide{margin:6px 0 0;padding-left:20px}
+.guide li{margin:4px 0}

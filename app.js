@@ -4,7 +4,7 @@
  * The app plans and files evidence. It never writes notes, answers or evidence for the apprentice.
  */
 "use strict";
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.1.0';
 const CFG = Object.assign({rootFolder:'Apprenticeship Evidence', redirectUri:''}, window.APP_CONFIG || {});
 const DEMO = /[?&]demo=1\b/.test(location.search) || !CFG.clientId || CFG.clientId.startsWith('PASTE');
 const ROOT = CFG.rootFolder;
@@ -208,7 +208,7 @@ function demoAI(kind){
       {kind:'photo', text:'Photo of work area set up safely before starting'}, {kind:'photo', text:'Photo of correct tool selected for the task'},
       {kind:'photo', text:'Photo of finished job showing quality of work'}, {kind:'book', text:'Complete written questions 1-5 in the unit book'}]}]});
     else if (kind === 'match') res({matches: open.slice(0,3).map(x=>({unitId:x.u.id, itemId:x.it.id, why:'Demo suggestion'}))});
-    else res({items: open.slice(0,4).map(x=>({unitId:x.u.id, itemId:x.it.id, shots:'Demo: photograph the key step'}))});
+    else res({guide:{title:'Demo job', overview:'Demo guide – the real one is written for your job.', safety:['Demo safety point'], tools:['Demo tool'], checks:['Demo check 1','Demo check 2'], learn:['Demo learning point'], standard:''}, items: open.slice(0,4).map(x=>({unitId:x.u.id, itemId:x.it.id, shots:'Demo: photograph the key step'}))});
   }, 700));
 }
 
@@ -436,10 +436,17 @@ function vCapture(){
 
 function vPlan(){
   const p = S.plan;
-  let h = vTop('Plan a job', 'Tell it what’s coming up at work and see which checklist items that job could tick off.');
+  let h = vTop('Plan a job', 'Tell it what’s coming up at work. You’ll get a job guide and see which checklist items the job could tick off.');
   h += `<label class="field"><span>Upcoming job</span><input type="text" id="plan-q" data-bind="plan.q" value="${esc(p.q)}" placeholder="e.g. Oil and filter service on a Hino 500"></label>
     <button class="btn primary block" data-act="plan" ${p.busy?'disabled':''}>What can this job cover?</button>`;
   if (p.msg) h += `<p class="status ${p.busy?'busy':''}">${esc(p.msg)}</p>`;
+  if (p.guide){
+    const g = p.guide; const list = (title, arr) => arr && arr.length ? `<h3 style="margin-top:14px">${title}</h3><ul class="guide">${arr.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>` : '';
+    h += `<div class="panel"><h3>Job guide${g.title?': '+esc(g.title):''}</h3>
+      ${g.overview?`<p>${esc(g.overview)}</p>`:''}
+      ${list('Safety first', g.safety)}${list('Tools and gear', g.tools)}${list('What to check', g.checks)}${list('Learning points', g.learn)}
+      <p class="rule">General guidance only. Always follow your workshop’s procedures, the manufacturer’s manual and specs${g.standard?', and '+esc(g.standard):''}, and check with your supervisor.</p></div>`;
+  }
   if (p.res && p.res.length){
     h += `<div class="panel"><h3>This job could cover</h3><ul class="items">${p.res.map(r=>{ const u = S.units[r.unitId]; if (!u) return ''; const it = (u.items||[]).find(x=>x.id===r.itemId); if (!it) return ''; const n = evFor(u.id,it.id).length;
       return `<li class="item ${n?'ok':''}"><div class="ihead"><span class="tick">${n?'✓':'•'}</span><p><span class="kind">${esc(unitLabel(u))}</span>${esc(it.text)}${r.shots?`<span class="meta" style="display:block">Photograph: ${esc(r.shots)}</span>`:''}</p></div>
@@ -668,20 +675,32 @@ async function saveEvidence(){
 
 async function runPlan(){
   const p = S.plan; const q = p.q.trim(); if (!q){ toast('Describe the job first.'); return; }
-  const items = openItems(); if (!items.length){ toast('Add a unit book first.'); return; }
-  p.busy = true; p.res = null; p.msg = 'Looking through your checklists…'; render();
+  const items = openItems();
+  p.busy = true; p.res = null; p.guide = null; p.msg = 'Putting together a job guide…'; render();
   const list = items.map(x=>({unitId:x.u.id, itemId:x.it.id, unit:unitLabel(x.u), item:x.it.text, have:x.n}));
-  const prompt = `An apprentice has this job coming up at work: ${JSON.stringify(q)}.
-Their evidence checklist as JSON (have = photos already saved for that item):
-${JSON.stringify(list)}
+  const prompt = `An apprentice in New Zealand has this job coming up at work: ${JSON.stringify(q)}.
+Their programme: ${JSON.stringify(S.profile.programme || 'a trade apprenticeship')}.
 
-List the checklist items this job could realistically provide evidence for, most useful first, preferring items where have is 0. Use only unitId and itemId values from the list. At most 10.
-"shots": what to photograph during the job, at most 15 words. Do not write notes or descriptions of the work for the apprentice.
-Reply with only JSON: {"items":[{"unitId":"...","itemId":"...","shots":"..."}]}`;
+Part 1 - "guide": a short practical briefing to help them prepare, like an experienced tradesperson would give before the job.
+- "title": short job name. "overview": 1-2 sentences on what the job involves.
+- "safety": up to 5 key hazards or precautions. "tools": up to 6 tools, gear or documents needed.
+- "checks": up to 12 things to inspect, check or do, in a sensible order, each under 18 words.
+- "learn": up to 3 things worth understanding or asking their supervisor about.
+- "standard": the main NZ standard, manual or rule that applies if there is a well-known one (e.g. the NZTA Vehicle Inspection Requirements Manual for a CoF), otherwise "".
+- Do not give specific numbers such as torque settings, pressures, clearances or limits; say to check the manufacturer's spec or the relevant manual instead.
+- Do not write notes, answers to unit book questions, or evidence statements for the apprentice.
+
+Part 2 - "items": from their evidence checklist below (have = photos already saved), list the items this job could realistically provide evidence for, most useful first, preferring items where have is 0. Use only unitId and itemId values from the list. At most 10. If the list is empty, return [].
+"shots": what to photograph during the job, at most 15 words.
+Checklist: ${JSON.stringify(list)}
+
+Reply with only JSON: {"guide":{"title":"","overview":"","safety":[],"tools":[],"checks":[],"learn":[],"standard":""},"items":[{"unitId":"...","itemId":"...","shots":"..."}]}`;
   try {
-    const r = await ai('plan', prompt, [], 1200);
+    const r = await ai('plan', prompt, [], 2500);
+    const g = r && r.guide; const arr = (a, n) => (Array.isArray(a) ? a : []).map(x=>String(x||'').trim()).filter(Boolean).slice(0, n).map(x=>x.slice(0, 220));
+    p.guide = g ? {title:String(g.title||'').slice(0,80), overview:String(g.overview||'').slice(0,400), safety:arr(g.safety,5), tools:arr(g.tools,6), checks:arr(g.checks,12), learn:arr(g.learn,3), standard:String(g.standard||'').slice(0,120)} : null;
     p.res = (r && Array.isArray(r.items) ? r.items : []).filter(x => S.units[x.unitId] && (S.units[x.unitId].items||[]).some(it=>it.id===x.itemId)).slice(0,10).map(x=>({unitId:x.unitId, itemId:x.itemId, shots:String(x.shots||'').slice(0,160)}));
-    p.msg = p.res.length ? '' : 'This job doesn’t match anything still open on your checklists.';
+    p.msg = p.res.length ? '' : (items.length ? 'This job doesn’t match anything still open on your checklists.' : 'Add a unit book to see which checklist items a job can cover.');
   } catch (e){ p.msg = aiMsg(e); }
   finally { p.busy = false; render(); }
 }
