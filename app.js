@@ -4,7 +4,7 @@
  * The app plans and files evidence. It never writes notes, answers or evidence for the apprentice.
  */
 "use strict";
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.1.1';
 const CFG = Object.assign({rootFolder:'Apprenticeship Evidence', redirectUri:''}, window.APP_CONFIG || {});
 const DEMO = /[?&]demo=1\b/.test(location.search) || !CFG.clientId || CFG.clientId.startsWith('PASTE');
 const ROOT = CFG.rootFolder;
@@ -55,15 +55,31 @@ async function authInit(){
   });
   await msalApp.initialize();
   const res = await msalApp.handleRedirectPromise();
-  const acct = (res && res.account) || msalApp.getAllAccounts()[0] || null;
-  if (acct) msalApp.setActiveAccount(acct);
+  let acct = (res && res.account) || msalApp.getActiveAccount() || msalApp.getAllAccounts()[0] || null;
+  if (!acct){
+    // Signed in before on this device? Try to pick the session back up quietly.
+    const hint = lastUser();
+    if (hint){
+      try { acct = (await msalApp.ssoSilent({scopes:SCOPES, loginHint:hint})).account; } catch {}
+    }
+  }
+  if (acct){ msalApp.setActiveAccount(acct); rememberUser(acct.username); }
   return acct;
+}
+const lastUser = () => { try { return localStorage.getItem('logbook-last-user') || ''; } catch { return ''; } };
+const rememberUser = u => { try { if (u) localStorage.setItem('logbook-last-user', u); } catch {} };
+function signIn(){
+  const hint = lastUser();
+  msalApp.loginRedirect(hint ? {scopes:SCOPES, loginHint:hint} : {scopes:SCOPES, prompt:'select_account'});
 }
 async function getToken(){
   const account = msalApp.getActiveAccount();
   try { return (await msalApp.acquireTokenSilent({scopes:SCOPES, account})).accessToken; }
   catch (e){
-    if (e instanceof msal.InteractionRequiredAuthError){ await msalApp.acquireTokenRedirect({scopes:SCOPES, account}); }
+    if (e instanceof msal.InteractionRequiredAuthError){
+      // Goes straight back through Microsoft without asking again if "Stay signed in" was chosen.
+      await msalApp.acquireTokenRedirect({scopes:SCOPES, account, loginHint: account && account.username});
+    }
     throw e;
   }
 }
@@ -290,7 +306,7 @@ function vMain(){
     <p class="sub">Plan your unit evidence, file photos against your unit checklists, and print a pack for your trainer to sign.</p>
     <p>Sign in with your Microsoft account. Your photos and packs are saved in your own OneDrive, in a folder called “${esc(ROOT)}”.</p>
     <button class="btn primary block big" data-act="signin">Sign in with Microsoft</button>
-    <p class="meta" style="margin-top:14px">Works with Outlook, Hotmail, Live and work or school Microsoft accounts.</p></div>`;
+    <p class="meta" style="margin-top:14px">Works with Outlook, Hotmail, Live and work or school Microsoft accounts. When Microsoft asks “Stay signed in?”, tap <b>Yes</b> so you don’t have to sign in every time.</p></div>`;
   if (S.view === 'unit') return vUnit();
   if (S.view === 'capture') return vCapture();
   if (S.view === 'plan') return vPlan();
@@ -930,8 +946,8 @@ document.addEventListener('click', e => {
   const act = el.dataset.act;
   if (act === 'modal-bg'){ if (e.target === el){ S.modal = null; render(); } return; }
   switch (act){
-    case 'signin': msalApp.loginRedirect({scopes:SCOPES, prompt:'select_account'}); break;
-    case 'signout': if (msalApp) msalApp.logoutRedirect({account:msalApp.getActiveAccount()}); else location.reload(); break;
+    case 'signin': signIn(); break;
+    case 'signout': try { localStorage.removeItem('logbook-last-user'); } catch {} if (msalApp) msalApp.logoutRedirect({account:msalApp.getActiveAccount()}); else location.reload(); break;
     case 'reload': location.reload(); break;
     case 'nav': S.view = el.dataset.v; S.editing = null; if (S.view === 'settings') S.pf = null; render(); break;
     case 'open-unit': S.unitId = el.dataset.id; S.view = 'unit'; render(); break;
